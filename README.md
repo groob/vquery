@@ -8,8 +8,12 @@
   Example: ```ruby vquery.rb 139186```
 
 # Credentials
+
 This script only works with environment variables.  
 VERACROSS_USERNAME  
 VERACROSS_PASSWORD  
 VERACROSS_CLIENT  
 The client is the part of your URL that identifies your school.
+
+# Why
+The official API doesn't do a lot of things I want.

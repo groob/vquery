@@ -42,7 +42,7 @@ class Scraper
     csv_page = link.click
     link = csv_page.links.last
     csv_output = agent.get(link.attributes.first[1]).body
-    return csv_output
+    return csv_output.force_encoding('cp1252')
   end
 
   def print_json

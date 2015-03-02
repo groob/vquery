@@ -1,3 +1,12 @@
+# How to Install
+You must have Ruby and bundler installed.
+First, download/Clone this repository, then
+
+```bash
+cd /path/to/vquery  
+bundle install
+```
+
 # How to use
 
 1. Log in to ESWeb, design and save your query.

@@ -1,28 +1,29 @@
-# How to Install
-You must have Ruby and bundler installed.
-First, download/Clone this repository, then
+Veracross Axiom Web Scraper Library
 
-```bash
-cd /path/to/vquery  
-bundle install
+For the ESWeb version, see [v0.0.2](https://github.com/groob/vquery/releases/tag/v0.0.2) and v0.0.2 [blog post](http://groob.io/posts/my-private-api/)
+
+Package axiom allows scraping any Veracross Query.
+
+# Example
+
+```go
+	// Create a axiom client (a logged in session)
+	client, err := axiom.NewAxiomClient(username, password, school)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// create a http request
+	
+	req, err := http.NewRequest("POST", "https://axiom.veracross.com/school/query/123456/result_data.json", nil)
+	
+	// Do request
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	// do something with resp, which will be a json stream
+	jsonBody , err := ioutil.ReadAll(resp.Body)
+
 ```
-
-# How to use
-
-1. Log in to ESWeb, design and save your query.
-2. Get the query id from the end of the URL  
-  Example: "esweb.asp?WCI=Results&Query=139186"
-  The query ID is 139186
-3. run ```ruby vquery.rb QUERY_ID```  
-  Example: ```ruby vquery.rb 139186```
-
-# Credentials
-
-This script only works with environment variables.  
-VERACROSS_USERNAME  
-VERACROSS_PASSWORD  
-VERACROSS_CLIENT  
-The client is the part of your URL that identifies your school.
-
-# Why
-The official API doesn't do a lot of things I want.

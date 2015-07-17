@@ -8,7 +8,7 @@ Package axiom allows scraping any Veracross Query.
 
 ```go
 	// Create a axiom client (a logged in session)
-	client, err := axiom.NewAxiomClient(username, password, school)
+	client, err := axiom.NewClient(username, password, school)
 	if err != nil {
 		log.Fatal(err)
 	}

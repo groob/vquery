@@ -2,6 +2,7 @@ package axiom
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -42,6 +43,15 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	// set x-csrf-token header
 	req.Header.Set("x-csrf-token", c.Token)
 	return c.client.Do(req)
+}
+
+func (c *Client) Report(reportID int) (*http.Response, error) {
+	jsonReportURL := fmt.Sprintf("https://axiom.veracross.com/%v/query/%v/result_data.json", c.School, reportID)
+	req, err := http.NewRequest("POST", jsonReportURL, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return c.Do(req)
 }
 
 // logs in to Axiom

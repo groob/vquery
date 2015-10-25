@@ -23,33 +23,25 @@ type Client struct {
 
 // NewClient returns a logged in Axiom user with cookies and x-csrf token.
 func NewClient(username, password, school string) (*Client, error) {
-	var config *Client
+	var client *Client
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
 	}
-	config = &Client{
+	client = &Client{
 		Username: username,
 		Password: password,
 		School:   school,
 		client:   &http.Client{Jar: jar},
 	}
-	err = config.login()
-	if err != nil {
-		return nil, err
-	}
-	return config, nil
+	return client, client.login()
 }
 
 // Do sends an API request and returns the API response.
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	// set x-csrf-token header
 	req.Header.Set("x-csrf-token", c.Token)
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.client.Do(req)
 }
 
 // logs in to Axiom
@@ -57,6 +49,9 @@ func (c *Client) login() error {
 	// open Axiom login page to set cookies and x-csrf-token
 	loginURL := fmt.Sprintf("https://axiom.veracross.com/%v/login", c.School)
 	req, err := http.NewRequest("GET", loginURL, nil)
+	if err != nil {
+		return err
+	}
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return err

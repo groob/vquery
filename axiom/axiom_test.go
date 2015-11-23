@@ -1,18 +1,13 @@
 package axiom
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 )
-
-var client = &Client{
-	Username: "Foo",
-	Password: "Bar",
-	School:   "Baz",
-}
 
 var head = `
 <!DOCTYPE html>
@@ -51,52 +46,177 @@ var head = `
 </head>
 `
 
-func mockServer() *httptest.Server {
-	f := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		fmt.Fprintln(w, head)
-	}
+// returns an HTML document with sample axiom login html
+var loginHandler = func(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, head)
+}
+
+// returns hello world
+var helloHandler = func(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "Hello World")
+}
+
+// mock http server
+func mockServer(f http.HandlerFunc) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(f))
 }
 
-func TestSetToken(t *testing.T) {
-	server := mockServer()
+// test that NewClient returns http.Client with a cookiejar
+func TestNewClientHTTP(t *testing.T) {
+	username := "foo"
+	password := "bar"
+	school := "baz"
+	client, err := NewClient(username, password, school)
+	if err != nil {
+		t.Fatal("Expected to get a new client", "got", err)
+	}
+
+	if client.client == nil {
+		t.Fatal("nil http client returned")
+	}
+	// TODO: Test cookiejar
+}
+
+type recordingTransport struct {
+	req *http.Request
+}
+
+func (t *recordingTransport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	t.req = req
+	return nil, errors.New("dummy impl")
+}
+
+func TestSubmit(t *testing.T) {
+	server := mockServer(loginHandler)
 	defer server.Close()
-
-	resp, err := http.Get(server.URL)
+	username := "foo"
+	password := "bar"
+	school := "baz"
+	tr := &recordingTransport{}
+	client, err := newClient(username, password, school)
 	if err != nil {
-		t.Fatal("mock server should respond to get request", err)
+		t.Fatal("Expected to get a new client", "got", err)
 	}
-	defer resp.Body.Close()
+	client.URL, _ = url.Parse(server.URL)
+	client.client = &http.Client{Transport: tr}
 
-	err = client.setToken(resp)
-	if err != nil {
-		t.Fatal("Should be able to process html")
-	}
-
-	if client.Token != "Pl0opv2ylPnZWrWtSon9siyOL5hjhpZWPFm5nsQtikY=" {
-		t.Fatal("Token not set")
-		fmt.Println(client)
+	client.submit()
+	if name := tr.req.FormValue("login_name"); name != username {
+		t.Error("Expected", username, "got", name)
 	}
 }
 
-func TestDo(t *testing.T) {
-	server := mockServer()
-	defer server.Close()
+//test that a new Client is returned correctly
+func TestNewClient(t *testing.T) {
+	username := "foo"
+	password := "bar"
+	school := "baz"
+	urlStr := fmt.Sprintf("https://axiom.veracross.com/%s/", school)
+	schoolURL, err := url.Parse(urlStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//token := "Pl0opv2ylPnZWrWtSon9siyOL5hjhpZWPFm5nsQtikY="
 
-	jar, err := cookiejar.New(nil)
+	client, err := newClient(username, password, school)
 	if err != nil {
-		t.Fatal("Cooke jar not set", err)
+		t.Fatal("Expected to get a new client", "got", err)
 	}
-	client.Token = "Pl0opv2ylPnZWrWtSon9siyOL5hjhpZWPFm5nsQtikY="
-	client.client = &http.Client{Jar: jar}
-	req, err := http.NewRequest("GET", server.URL, nil)
+
+	t.Log("Testing the Client struct")
+	if client.Username != username {
+		t.Fatal("Expected", username, "got", client.Username)
+	}
+	if client.Password != password {
+		t.Fatal("Expected", password, "got", client.Password)
+	}
+	if client.School != school {
+		t.Fatal("Expected", school, "got", client.School)
+	}
+	if client.URL.Path != schoolURL.Path {
+		t.Fatal("Expected", schoolURL.Path, "got", client.URL.Path)
+	}
+
+	// loggedInClient, err := NewClient(username, password, school)
+	// if err != nil {
+	// 	t.Fatal("Expected to get a new client", "got", err)
+	// }
+	// if loggedInClient.Token != token {
+	// 	t.Error("Expected", token, "got", loggedInClient.Token)
+	// }
+	// test to see if url.Parse in newClient() returns an error.
+	invalidURLSchool := `WRTH #R$TH#%$T //foo?.xxx://`
+	_, err = newClient(username, password, invalidURLSchool)
+	if err == nil {
+		t.Fatal("Expected newClient to return an error, invalidURL")
+	}
+	_, err = NewClient(username, password, invalidURLSchool)
+	if err == nil {
+		t.Fatal("Expected newClient to return an error, invalidURL")
+	}
+}
+
+// Test loginToken function
+func TestLoginToken(t *testing.T) {
+	server := mockServer(loginHandler)
+	defer server.Close()
+	token := "Pl0opv2ylPnZWrWtSon9siyOL5hjhpZWPFm5nsQtikY="
+	loginURL := fmt.Sprintf(server.URL + "/login")
+	username := "foo"
+	password := "bar"
+	school := "baz"
+
+	client, err := newClient(username, password, school)
 	if err != nil {
-		t.Fatal("Should be able to set http NewRequest", err)
+		t.Fatal(err)
 	}
-	resp, err := client.Do(req)
+	err = client.loginToken(loginURL)
 	if err != nil {
-		t.Fatal("Should be able to mock http request", err)
+		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+
+	err = client.loginToken(loginURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if client.Token != token {
+		t.Fatal("expected", token, "got", client.Token)
+	}
+	err = client.loginToken("fff")
+	if err == nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSetToken(t *testing.T) {
+	server := mockServer(loginHandler)
+	defer server.Close()
+	token := "Pl0opv2ylPnZWrWtSon9siyOL5hjhpZWPFm5nsQtikY="
+
+	client := &Client{
+		Username: "foo",
+		Password: "bar",
+		School:   "baz",
+	}
+
+	t.Log("testing setToken()")
+	resp, _ := http.Get(server.URL)
+	err := client.setToken(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.Token != token {
+		t.Fatal("Expected", token, "got", client.Token)
+	}
+
+	helloServer := mockServer(helloHandler)
+	defer helloServer.Close()
+
+	client.Token = ""
+	resp, _ = http.Get(helloServer.URL)
+	err = client.setToken(resp)
+	if err == nil {
+		t.Error("if there is no token set, setToken should return an error, got nothing")
+	}
 }

@@ -1,0 +1,13 @@
+interval = 60
+reports_path = "/Users/Shared/Desktop"
+veracross_username = "username"
+veracross_password = "secret"
+veracross_school = "whitby"
+
+[[reports]]
+name = "open_house_attendees"
+id =  162444
+
+[[reports]]
+name = "open_house_dates"
+id =  162444

@@ -85,6 +85,7 @@ func runReport(reportID int, name string) {
 		log.Println(err)
 		return
 	}
+	log.Printf("Saving axiom report %s", name)
 	//save report
 	err = saveReport(body, name)
 	if err != nil {
@@ -123,11 +124,13 @@ func main() {
 		os.Exit(0)
 	}
 	//run as a daemon, saving reports from config
+	interval := time.Minute * conf.Interval
 	done := make(chan bool)
-	ticker := time.NewTicker(time.Minute * conf.Interval).C
+	ticker := time.NewTicker(interval).C
 	for {
 		go run(done)
 		<-done
+		log.Printf("Sleeping for %s", interval)
 		<-ticker
 	}
 }

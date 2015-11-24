@@ -15,7 +15,7 @@ vquery -config config.toml
 ```
 
 
-# Library use.
+# Use as a Go Library
 
 If you'd like to use the code as a Go library to extend this proggram, the documentation is available on [godoc](https://godoc.org/github.com/groob/vquery/axiom)
 

@@ -10,8 +10,23 @@ vquery -config config.toml -report 12345
 ```
 
 Not specifying a report parameter will save the reports specified in `config.toml` to a destination on disk. 
+The utility will run continuously and refresh the report at the interval specified in the config(in minutes).
 ```bash
 vquery -config config.toml
+```
+
+# Saving a CSV file
+To save as a CSV, you can combine the json output with additional command like tools, like [jq](https://stedolan.github.io/jq/) and [json2csv](https://github.com/jehiah/json2csv)
+
+Example:
+The example below will save report #163998 as a csv file, using the `person_id`, `first_name`, `last_name` and `email_1` fields in the report. 
+```bash
+vquery -config config.toml -report 163998 | jq -c '.[]' | json2csv -k person_id,first_name,last_name,email_1 > people.csv
+```
+We can do further work like, sorting the results alphabetically by `last_name` first. 
+
+```bash
+vquery -config config.toml -report 163998 | jq -c '.[]' |json2csv -k person_id,first_name,last_name,email_1 | sort -k 3,3 -t,
 ```
 
 

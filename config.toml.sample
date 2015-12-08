@@ -1,4 +1,5 @@
-interval = 60
+# values like "60s", "50m30s", "3h"
+interval = "60m"
 reports_path = "/Users/Shared/Desktop"
 veracross_username = "username"
 veracross_password = "secret"
@@ -7,6 +8,12 @@ veracross_school = "whitby"
 [[reports]]
 name = "open_house_attendees"
 id =  162444
+# defaults to json if not specified
+format = "csv"
+# which JSON keys should be used for the CSV header
+keys = ["person_id","first_name","last_name","email_1"]
+# defaults to false if no line is specified
+print_header = true
 
 [[reports]]
 name = "open_house_dates"

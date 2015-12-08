@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/csv"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,23 +29,37 @@ var (
 )
 
 type report struct {
-	Name string `toml:"name"`
-	ID   int    `toml:"id"`
+	Name        string      `toml:"name"`
+	ID          int         `toml:"id"`
+	Format      string      `toml:"format"`
+	Keys        stringArray `toml:"keys"`
+	PrintHeader bool        `toml:"print_header"`
 }
+
 type config struct {
-	Interval          time.Duration `toml:"interval"`
-	VeracrossUsername string        `toml:"veracross_username"`
-	VeracrossPassword string        `toml:"veracross_password"`
-	VeracrossSchool   string        `toml:"veracross_school"`
-	Reports           []report      `toml:"reports"`
-	ReportsPath       string        `toml:"reports_path"`
+	Interval          duration `toml:"interval"`
+	VeracrossUsername string   `toml:"veracross_username"`
+	VeracrossPassword string   `toml:"veracross_password"`
+	VeracrossSchool   string   `toml:"veracross_school"`
+	Reports           []report `toml:"reports"`
+	ReportsPath       string   `toml:"reports_path"`
+}
+
+type duration struct {
+	time.Duration
+}
+
+func (d *duration) UnmarshalText(text []byte) error {
+	var err error
+	d.Duration, err = time.ParseDuration(string(text))
+	return err
 }
 
 func init() {
 	flag.Parse()
 
 	if *fVersion {
-		fmt.Printf("query - version %s\n", Version)
+		fmt.Printf("vquery - version %s\n", Version)
 		os.Exit(0)
 	}
 
@@ -94,6 +111,55 @@ func runReport(reportID int, name string) {
 	}
 }
 
+func saveCSVReport(r report) {
+	defer wg.Done()
+	if len(r.Keys) == 0 {
+		log.Println("must specify keys for csv header")
+		return
+	}
+	csvFile, err := os.Create(conf.ReportsPath + "/" + r.Name + ".csv")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer csvFile.Close()
+	log.Printf("Saving axiom report as csv file %s.csv", r.Name)
+	runCSVReport(r, csvFile)
+}
+
+func runCSVReport(r report, output io.Writer) {
+	var csvJSON []map[string]interface{}
+	resp, err := client.Report(r.ID)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer resp.Body.Close()
+	err = json.NewDecoder(resp.Body).Decode(&csvJSON)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	var expandedKeys [][]string
+	for _, key := range r.Keys {
+		expandedKeys = append(expandedKeys, strings.Split(key, "."))
+	}
+	var w *csv.Writer
+	w = csv.NewWriter(output)
+	if r.PrintHeader {
+		w.Write(r.Keys)
+		w.Flush()
+	}
+	for _, data := range csvJSON {
+		var record []string
+		for _, expandedKey := range expandedKeys {
+			record = append(record, getValue(data, expandedKey))
+		}
+		w.Write(record)
+		w.Flush()
+	}
+}
+
 // prints a report to stdout
 func printReport(id int) {
 	resp, err := client.Report(id)
@@ -109,9 +175,13 @@ func printReport(id int) {
 }
 
 func run(done chan bool) {
-	for _, report := range conf.Reports {
+	for _, r := range conf.Reports {
 		wg.Add(1)
-		go runReport(report.ID, report.Name)
+		if r.Format != "csv" {
+			go runReport(r.ID, r.Name)
+		} else {
+			go saveCSVReport(r)
+		}
 	}
 	wg.Wait()
 	done <- true
@@ -124,7 +194,8 @@ func main() {
 		os.Exit(0)
 	}
 	//run as a daemon, saving reports from config
-	interval := time.Minute * conf.Interval
+	// interval := time.Minute * conf.Interval
+	interval := conf.Interval.Duration
 	done := make(chan bool)
 	ticker := time.NewTicker(interval).C
 	for {

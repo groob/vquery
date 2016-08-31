@@ -34,7 +34,7 @@ var head = `
     <script src="/assets/session-79723aa99a35430e45d3943b6cb5b5e0.js"></script>
 
     <meta content="authenticity_token" name="csrf-param" />
-<meta content="Pl0opv2ylPnZWrWtSon9siyOL5hjhpZWPFm5nsQtikY=" name="csrf-token" />
+<meta name="csrf-token" content="Pl0opv2ylPnZWrWtSon9siyOL5hjhpZWPFm5nsQtikY=" />
 
     <script type="text/javascript">
         $.ajaxSetup({

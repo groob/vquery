@@ -127,7 +127,7 @@ func (c *Client) setToken(resp *http.Response) error {
 		if n.Type == html.ElementNode && n.Data == "meta" {
 			for _, a := range n.Attr {
 				if a.Key == "name" && a.Val == "csrf-token" {
-					token = n.Attr[0].Val
+					token = n.Attr[1].Val // used to be 0
 					// set Token
 					c.Token = token
 				}

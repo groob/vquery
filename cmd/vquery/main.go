@@ -65,6 +65,8 @@ func init() {
 		os.Exit(0)
 	}
 
+	logger = log.NewLogfmtLogger(os.Stderr)
+
 	if _, err := toml.DecodeFile(*fConfig, &conf); err != nil {
 		level.Info(logger).Log(
 			"msg", "decode config file",
@@ -73,8 +75,6 @@ func init() {
 		)
 		os.Exit(1)
 	}
-
-	logger := log.NewLogfmtLogger(os.Stderr)
 
 	c, err := axiom.NewClient(
 		conf.VeracrossUsername,

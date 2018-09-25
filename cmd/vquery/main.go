@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/groob/vquery/axiom"
 )
 
@@ -26,6 +27,7 @@ var (
 	conf      config
 	client    *axiom.Client
 	wg        sync.WaitGroup
+	logger    log.Logger
 )
 
 type report struct {
@@ -64,13 +66,29 @@ func init() {
 	}
 
 	if _, err := toml.DecodeFile(*fConfig, &conf); err != nil {
-		log.Fatal(err)
+		level.Info(logger).Log(
+			"msg", "decode config file",
+			"err", err,
+			"path", *fConfig,
+		)
+		os.Exit(1)
 	}
 
-	c, err := axiom.NewClient(conf.VeracrossUsername, conf.VeracrossPassword,
-		conf.VeracrossSchool)
+	logger := log.NewLogfmtLogger(os.Stderr)
+
+	c, err := axiom.NewClient(
+		conf.VeracrossUsername,
+		conf.VeracrossPassword,
+		conf.VeracrossSchool,
+		axiom.WithLogger(logger),
+	)
 	if err != nil {
-		log.Fatal(err)
+		level.Info(logger).Log(
+			"msg", "create axiom client",
+			"err", err,
+			"school", conf.VeracrossUsername,
+		)
+		os.Exit(1)
 	}
 	client = c
 }
@@ -89,55 +107,55 @@ func saveReport(jsonData []byte, name string) error {
 }
 
 // runs a report from Veracross and saves the JSON file localy
-func runReport(reportID int, name string) {
+func runReport(reportID int, name string, logger log.Logger) {
 	defer wg.Done()
 	resp, err := client.Report(reportID)
 	if err != nil {
-		log.Println(err)
+		level.Info(logger).Log("err", err)
 		return
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		level.Info(logger).Log("err", err)
 		return
 	}
-	log.Printf("Saving axiom report %s", name)
+	level.Debug(logger).Log("msg", "saving axiom report", "report", name, "id", reportID)
 	//save report
 	err = saveReport(body, name)
 	if err != nil {
-		log.Println(err)
+		level.Info(logger).Log("err", err)
 		return
 	}
 }
 
-func saveCSVReport(r report) {
+func saveCSVReport(r report, logger log.Logger) {
 	defer wg.Done()
 	if len(r.Keys) == 0 {
-		log.Println("must specify keys for csv header")
+		level.Info(logger).Log("err", "must specify keys for csv header")
 		return
 	}
 	csvFile, err := os.Create(conf.ReportsPath + "/" + r.Name + ".csv")
 	if err != nil {
-		log.Println(err)
+		level.Info(logger).Log("err", err)
 		return
 	}
 	defer csvFile.Close()
-	log.Printf("Saving axiom report as csv file %s.csv", r.Name)
-	runCSVReport(r, csvFile)
+	level.Debug(logger).Log("msg", "saving axiom report as csv file", "file", csvFile.Name())
+	runCSVReport(r, csvFile, logger)
 }
 
-func runCSVReport(r report, output io.Writer) {
+func runCSVReport(r report, output io.Writer, logger log.Logger) {
 	var csvJSON []map[string]interface{}
 	resp, err := client.Report(r.ID)
 	if err != nil {
-		log.Println(err)
+		level.Info(logger).Log("err", err)
 		return
 	}
 	defer resp.Body.Close()
 	err = json.NewDecoder(resp.Body).Decode(&csvJSON)
 	if err != nil {
-		log.Println(err)
+		level.Info(logger).Log("err", err)
 		return
 	}
 	var expandedKeys [][]string
@@ -161,26 +179,26 @@ func runCSVReport(r report, output io.Writer) {
 }
 
 // prints a report to stdout
-func printReport(id int) {
+func printReport(id int, logger log.Logger) {
 	resp, err := client.Report(id)
 	if err != nil {
-		log.Println(err)
+		level.Info(logger).Log("err", err)
 		return
 	}
 	defer resp.Body.Close()
 	_, err = io.Copy(os.Stdout, resp.Body)
 	if err != nil {
-		log.Println(err)
+		level.Info(logger).Log("err", err)
 	}
 }
 
-func run(done chan bool) {
+func run(done chan bool, logger log.Logger) {
 	for _, r := range conf.Reports {
 		wg.Add(1)
 		if r.Format != "csv" {
-			go runReport(r.ID, r.Name)
+			go runReport(r.ID, r.Name, logger)
 		} else {
-			go saveCSVReport(r)
+			go saveCSVReport(r, logger)
 		}
 	}
 	wg.Wait()
@@ -190,18 +208,19 @@ func run(done chan bool) {
 func main() {
 	// print a single report and exit
 	if *fReportID != 0 {
-		printReport(*fReportID)
+		printReport(*fReportID, logger)
 		os.Exit(0)
 	}
+
 	//run as a daemon, saving reports from config
 	// interval := time.Minute * conf.Interval
 	interval := conf.Interval.Duration
 	done := make(chan bool)
 	ticker := time.NewTicker(interval).C
 	for {
-		go run(done)
+		go run(done, logger)
 		<-done
-		log.Printf("Sleeping for %s", interval)
+		level.Debug(logger).Log("msg", "sleep until ticker", "duration", interval)
 		<-ticker
 	}
 }

@@ -2,3 +2,4 @@ env
 vqserver
 *.toml
 cmd/vquery/vquery
+build/
